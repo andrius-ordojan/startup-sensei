@@ -1,9 +1,13 @@
 package main
 
 import (
+	"encoding/json"
+	"os"
+
 	"github.com/gocolly/colly/v2"
 )
 
+// TODO: add rogue startup podcast
 const podcastlink = "https://www.startupsfortherestofus.com/archives"
 
 type episode struct {
@@ -13,7 +17,9 @@ type episode struct {
 	Url         string
 }
 
+// TODO: add graceful shutdown so it it doesn't ruin the datastrucuture when kill signal is sent
 func main() {
+	// TODO: read from local file first so I can continue from where I left off
 	episodes := []*episode{}
 
 	c := colly.NewCollector(
@@ -32,4 +38,9 @@ func main() {
 	})
 
 	c.Visit(podcastlink)
+
+	// TODO: write this to file instead
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	enc.Encode(episodes)
 }
