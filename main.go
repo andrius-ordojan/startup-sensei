@@ -8,6 +8,8 @@ import (
 	"github.com/gocolly/colly/v2"
 )
 
+const resultFile = "result.json"
+
 // TODO: add rogue startup podcast
 type episode struct {
 	Title       string `selector:"h1.entry-title"`
@@ -21,7 +23,7 @@ type podcast struct {
 	episodes        []*episode
 }
 
-func scrapeStartupsForTheRestOfUs() (episode, error) {
+func scrapeStartupsForTheRestOfUs(resultFile *os.File) (episode, error) {
 	podcast := podcast{
 		domain:          "www.startupsfortherestofus.com",
 		archivePageLink: "https://www.startupsfortherestofus.com/archives",
@@ -62,7 +64,20 @@ func run() error {
 	// defer cancel()
 	// TODO: read from local file first so I can continue from where I left off
 
-	scrapeStartupsForTheRestOfUs()
+	var file *os.File
+	defer file.Close()
+	if _, err := os.Stat(resultFile); err == nil {
+		// TODO: open the file
+		// read the data to pass to scraper
+	} else if os.IsNotExist(err) {
+		file, err = os.Create(resultFile)
+		if err != nil {
+			fmt.Println("Error creating file:", err)
+			return err
+		}
+	}
+	scrapeStartupsForTheRestOfUs(file)
+
 	return nil
 }
 
