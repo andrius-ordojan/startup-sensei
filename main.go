@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 
@@ -17,6 +16,7 @@ type episode struct {
 	PublishedAt string `selector:"time.entry-time"`
 	Url         string
 }
+
 type podcast struct {
 	domain          string
 	archivePageLink string
@@ -28,15 +28,13 @@ func scrapeStartupsForTheRestOfUs(resultFile *os.File) (episode, error) {
 		domain:          "www.startupsfortherestofus.com",
 		archivePageLink: "https://www.startupsfortherestofus.com/archives",
 	}
-	fmt.Println(podcast)
+	fmt.Println(pod)
 
-	return episode{}, nil
-	const podcastlink = "https://www.startupsfortherestofus.com/archives"
+	c := colly.NewCollector(colly.AllowedDomains(pod.domain))
 
-	episodes := []*episode{}
-	c := colly.NewCollector(
-		colly.AllowedDomains("www.startupsfortherestofus.com"),
-	)
+	c.OnError(func(r *colly.Response, err error) {
+		fmt.Println("Request URL:", r.Request.URL, "failed with response:", r, "\nError:", err)
+	})
 
 	c.OnHTML("ul.archive-list a[href]", func(e *colly.HTMLElement) {
 		c.Visit(e.Request.AbsoluteURL(e.Attr("href")))
@@ -46,17 +44,19 @@ func scrapeStartupsForTheRestOfUs(resultFile *os.File) (episode, error) {
 		episode := &episode{}
 		e.Unmarshal(episode)
 		episode.Url = e.Request.URL.String()
-		episodes = append(episodes, episode)
+		pod.episodes = append(pod.episodes, episode)
 	})
 
-	c.Visit(podcastlink)
+	c.Visit(pod.archivePageLink)
 
-	// TODO: write this to file instead
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	enc.Encode(episodes)
+	return pod, nil
 
-	return episode{}, nil
+	// // TODO: write this to file instead
+	// enc := json.NewEncoder(os.Stdout)
+	// enc.SetIndent("", "  ")
+	// enc.Encode(episodes)
+	//
+	// return episode{}, nil
 }
 
 func run() error {
