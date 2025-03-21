@@ -47,8 +47,6 @@ func (p *podcast) encode() error {
 	}
 
 	enc := json.NewEncoder(p.podcastFile)
-	enc.SetIndent("", "  ")
-
 	return enc.Encode(p)
 }
 
