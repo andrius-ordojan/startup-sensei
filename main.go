@@ -1,13 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 
 	"github.com/gocolly/colly/v2"
 )
 
-const resultFile = "result.json"
+const podcastFilePath = "content.json"
 
 // TODO: add rogue startup podcast
 type episode struct {
@@ -18,66 +19,110 @@ type episode struct {
 }
 
 type podcast struct {
-	domain          string
-	archivePageLink string
-	episodes        []*episode
+	Domain          string
+	ArchivePageLink string
+	Episodes        []*episode
+	podcastFile     *os.File
 }
 
-func scrapeStartupsForTheRestOfUs(resultFile *os.File) (episode, error) {
-	podcast := podcast{
-		domain:          "www.startupsfortherestofus.com",
-		archivePageLink: "https://www.startupsfortherestofus.com/archives",
-	}
-	fmt.Println(pod)
+func (p *podcast) addEpisode(e episode) error {
+	p.Episodes = append(p.Episodes, &e)
 
-	c := colly.NewCollector(colly.AllowedDomains(pod.domain))
+	if len(p.Episodes)%10 == 0 {
+		fmt.Println("total episodes: ", len(p.Episodes))
+		if err := p.encode(); err != nil {
+			return fmt.Errorf("could not encode podcast: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (p *podcast) encode() error {
+	if err := p.podcastFile.Truncate(0); err != nil {
+		return err
+	}
+	if _, err := p.podcastFile.Seek(0, 0); err != nil {
+		return err
+	}
+
+	enc := json.NewEncoder(p.podcastFile)
+	enc.SetIndent("", "  ")
+
+	return enc.Encode(p)
+}
+
+func (p *podcast) decode() error {
+	if _, err := p.podcastFile.Seek(0, 0); err != nil {
+		return fmt.Errorf("could not seek file: %v", err)
+	}
+
+	dec := json.NewDecoder(p.podcastFile)
+	if err := dec.Decode(p); err != nil {
+		return fmt.Errorf("cloud not decode JSON: %w", err)
+	}
+	return nil
+}
+
+func NewPodcast(podcastFile *os.File) *podcast {
+	p := &podcast{
+		Domain:          "www.startupsfortherestofus.com",
+		ArchivePageLink: "https://www.startupsfortherestofus.com/archives",
+		podcastFile:     podcastFile,
+	}
+	p.decode()
+	fmt.Println("decoded: ", len(p.Episodes))
+	return p
+}
+
+func scrapeStartupsForTheRestOfUs(p *podcast) {
+	c := colly.NewCollector(colly.AllowedDomains(p.Domain))
 
 	c.OnError(func(r *colly.Response, err error) {
 		fmt.Println("Request URL:", r.Request.URL, "failed with response:", r, "\nError:", err)
 	})
 
 	c.OnHTML("ul.archive-list a[href]", func(e *colly.HTMLElement) {
-		c.Visit(e.Request.AbsoluteURL(e.Attr("href")))
+		exists := false
+		for _, episode := range p.Episodes {
+			if episode.Url == e.Request.AbsoluteURL(e.Attr("href")) {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			c.Visit(e.Request.AbsoluteURL(e.Attr("href")))
+		}
 	})
 
 	c.OnHTML(".content", func(e *colly.HTMLElement) {
 		episode := &episode{}
 		e.Unmarshal(episode)
 		episode.Url = e.Request.URL.String()
-		pod.episodes = append(pod.episodes, episode)
+		p.addEpisode(*episode)
 	})
 
-	c.Visit(pod.archivePageLink)
-
-	return pod, nil
-
-	// // TODO: write this to file instead
-	// enc := json.NewEncoder(os.Stdout)
-	// enc.SetIndent("", "  ")
-	// enc.Encode(episodes)
-	//
-	// return episode{}, nil
+	c.Visit(p.ArchivePageLink)
 }
 
 func run() error {
-	// ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
-	// defer cancel()
-	// TODO: read from local file first so I can continue from where I left off
+	var podcastFile *os.File
+	defer podcastFile.Close()
 
-	var file *os.File
-	defer file.Close()
-	if _, err := os.Stat(resultFile); err == nil {
-		// TODO: open the file
-		// read the data to pass to scraper
-	} else if os.IsNotExist(err) {
-		file, err = os.Create(resultFile)
+	if _, err := os.Stat(podcastFilePath); err == nil {
+		podcastFile, err = os.OpenFile(podcastFilePath, os.O_RDWR, 0666)
 		if err != nil {
-			fmt.Println("Error creating file:", err)
-			return err
+			return fmt.Errorf("could not open file: %w", err)
+		}
+	} else if os.IsNotExist(err) {
+		podcastFile, err = os.Create(podcastFilePath)
+		if err != nil {
+			return fmt.Errorf("could not create podcast file: %w", err)
 		}
 	}
-	scrapeStartupsForTheRestOfUs(file)
 
+	pod := NewPodcast(podcastFile)
+	scrapeStartupsForTheRestOfUs(pod)
 	return nil
 }
 
