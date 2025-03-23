@@ -17,7 +17,6 @@ type episode struct {
 	PublishedAt string `selector:"time.entry-time"`
 	Url         string
 }
-
 type podcast struct {
 	Domain          string
 	ArchivePageLink string
@@ -68,9 +67,72 @@ func NewPodcast(podcastFile *os.File) *podcast {
 		ArchivePageLink: "https://www.startupsfortherestofus.com/archives",
 		podcastFile:     podcastFile,
 	}
-	p.decode()
-	fmt.Println("decoded: ", len(p.Episodes))
+	// p.decode()
 	return p
+}
+
+type podcasts struct {
+	Podcasts    []*podcast
+	podcastFile *os.File
+}
+
+func NewPodcasts(podcastFile *os.File) *podcasts {
+	p := &podcasts{
+		podcastFile: podcastFile,
+	}
+	p.decode()
+
+	if len(p.Podcasts) == 0 {
+		p.Podcasts = append(p.Podcasts,
+			&podcast{
+				Domain:          "www.startupsfortherestofus.com",
+				ArchivePageLink: "https://www.startupsfortherestofus.com/archives",
+				podcastFile:     podcastFile,
+			})
+		// TODO: rogue startups
+		p.Podcasts = append(p.Podcasts,
+			&podcast{
+				Domain:          "www.startupsfortherestofus.com",
+				ArchivePageLink: "https://www.startupsfortherestofus.com/archives",
+				podcastFile:     podcastFile,
+			})
+	} else {
+		s := fmt.Sprintf("decoded: %s - %d episodes; %s - %d episodes",
+			p.Podcasts[0].Domain,
+			len(p.Podcasts[0].Episodes),
+			p.Podcasts[1].Domain,
+			len(p.Podcasts[1].Episodes))
+		fmt.Println(s)
+	}
+
+	return p
+}
+
+func (p *podcasts) encode() error {
+	if err := p.podcastFile.Truncate(0); err != nil {
+		return err
+	}
+	if _, err := p.podcastFile.Seek(0, 0); err != nil {
+		return err
+	}
+
+	enc := json.NewEncoder(p.podcastFile)
+	return enc.Encode(p)
+}
+
+func (p *podcasts) decode() error {
+	if _, err := p.podcastFile.Seek(0, 0); err != nil {
+		return fmt.Errorf("could not seek file: %v", err)
+	}
+
+	dec := json.NewDecoder(p.podcastFile)
+	if err := dec.Decode(p); err != nil {
+		return fmt.Errorf("cloud not decode JSON: %w", err)
+	}
+	return nil
+}
+
+func scrapeRogueStartups(p *podcast) {
 }
 
 func scrapeStartupsForTheRestOfUs(p *podcast) {
@@ -119,8 +181,10 @@ func run() error {
 		}
 	}
 
-	pod := NewPodcast(podcastFile)
-	scrapeStartupsForTheRestOfUs(pod)
+	pods := NewPodcasts(podcastFile)
+	fmt.Println(pods)
+	// pod := NewPodcast(podcastFile)
+	// scrapeStartupsForTheRestOfUs(pod)
 	return nil
 }
 
