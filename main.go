@@ -4,17 +4,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
+	"strings"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/gocolly/colly/v2"
 )
 
 const podcastFilePath = "content.json"
 
-// TODO: add rogue startup podcast
 type episode struct {
-	Title       string `selector:"h1.entry-title"`
-	Content     string `selector:"div.entry-content"`
-	PublishedAt string `selector:"time.entry-time"`
+	Title       string
+	PublishedAt string
+	Content     string
 	Url         string
 }
 type podcast struct {
@@ -133,6 +135,67 @@ func (p *podcasts) decode() error {
 }
 
 func scrapeRogueStartups(p *podcast) {
+	c := colly.NewCollector(colly.AllowedDomains(p.Domain))
+
+	c.OnError(func(r *colly.Response, err error) {
+		fmt.Println("Request URL:", r.Request.URL, "failed with response:", r, "\nError:", err)
+	})
+
+	c.OnHTML("body", func(e *colly.HTMLElement) {
+		if !strings.Contains(e.Request.URL.Path, "/episodes/") {
+			return
+		}
+
+		title := strings.TrimSpace(e.DOM.Find("h1.text-3xl").Text())
+		publishedDate := strings.TrimSpace(e.DOM.Find("span.text-sm.text-skin-a11y").First().Text())
+
+		re := regexp.MustCompile(`\s+`)
+		transcript := re.ReplaceAllString(strings.TrimSpace(e.DOM.Find("#transcript-body").Text()), " ")
+		showNotes := ""
+		e.DOM.Find("h2").Each(func(i int, s *goquery.Selection) {
+			if strings.Contains(s.Text(), "Show Notes") {
+				showNotes = re.ReplaceAllString(strings.TrimSpace(s.Parent().Find("div.prose").Text()), " ")
+			}
+		})
+
+		episode := &episode{
+			Title:       title,
+			PublishedAt: publishedDate,
+			Content:     fmt.Sprintf("Show Notes: %s Transcript: %s", showNotes, transcript),
+			Url:         e.Request.URL.String(),
+		}
+
+		// TODO: should check that eposode correct format meaning it contains contentn and all other fields
+		p.addEpisode(*episode)
+	})
+
+	c.OnHTML("a[href^='/episodes/']", func(e *colly.HTMLElement) {
+		episodeURL := e.Request.AbsoluteURL(e.Attr("href"))
+
+		// TODO: add this later
+		// exists := false
+		// for _, episode := range p.Episodes {
+		// 	if episode.Url == e.Request.AbsoluteURL(e.Attr("href")) {
+		// 		exists = true
+		// 		break
+		// 	}
+		// }
+		// if !exists {
+		// 	c.Visit(e.Request.AbsoluteURL(e.Attr("href")))
+		// }
+		e.Request.Visit(episodeURL)
+	})
+
+	c.OnHTML("a[href*='?page=']", func(e *colly.HTMLElement) {
+		text := strings.TrimSpace(e.Text)
+		if text == "Next" {
+			nextPageURL := e.Request.AbsoluteURL(e.Attr("href"))
+			e.Request.Visit(nextPageURL)
+		}
+	})
+
+	// TODO: chamnge this to the correct URL
+	c.Visit("https://roguestartups.com/?page=1")
 }
 
 func scrapeStartupsForTheRestOfUs(p *podcast) {
@@ -156,9 +219,25 @@ func scrapeStartupsForTheRestOfUs(p *podcast) {
 	})
 
 	c.OnHTML(".content", func(e *colly.HTMLElement) {
-		episode := &episode{}
-		e.Unmarshal(episode)
-		episode.Url = e.Request.URL.String()
+		// TODO: double check that this is the correct way to remove elements
+		e.DOM.Find(".social-share").Remove()
+		e.DOM.Find(".podcast_player").Remove()
+
+		title := strings.TrimSpace(e.DOM.Find("h1.entry-title").Text())
+		publishedDate := strings.TrimSpace(e.DOM.Find("time.entry-time").Text())
+
+		content := strings.TrimSpace(e.DOM.Find("div.entry-content").Text())
+		re := regexp.MustCompile(`\s+`)
+		content = re.ReplaceAllString(content, " ")
+
+		episode := &episode{
+			Title:       title,
+			PublishedAt: publishedDate,
+			Content:     content,
+			Url:         e.Request.URL.String(),
+		}
+
+		// TODO: should check that eposode correct format meaning it contains contentn and all other fields
 		p.addEpisode(*episode)
 	})
 
@@ -166,6 +245,18 @@ func scrapeStartupsForTheRestOfUs(p *podcast) {
 }
 
 func run() error {
+	// p := &podcast{
+	// 	Domain:          "www.startupsfortherestofus.com",
+	// 	ArchivePageLink: "https://www.startupsfortherestofus.com/archives",
+	// }
+	// scrapeStartupsForTheRestOfUs(p)
+	p := &podcast{
+		Domain:          "roguestartups.com",
+		ArchivePageLink: "https://roguestartups.com/",
+	}
+	scrapeRogueStartups(p)
+	return nil
+
 	var podcastFile *os.File
 	defer podcastFile.Close()
 
