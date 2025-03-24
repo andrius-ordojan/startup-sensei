@@ -119,8 +119,8 @@ func (p *RogueStartups) Scrape(ctx context.Context) {
 func (p *RogueStartups) AddEpisode(e Episode) error {
 	p.Episodes = append(p.Episodes, &e)
 
-	if len(p.Episodes)%10 == 0 {
-		log.Println("total episodes: ", len(p.Episodes))
+	if len(p.Episodes)%30 == 0 {
+		log.Println("episode count: ", len(p.Episodes))
 		if err := p.Encode(); err != nil {
 			return fmt.Errorf("could not encode podcast: %w", err)
 		}
@@ -230,8 +230,8 @@ func (p *StartupsForTheRestOfUs) Scrape(ctx context.Context) {
 func (p *StartupsForTheRestOfUs) AddEpisode(e Episode) error {
 	p.Episodes = append(p.Episodes, &e)
 
-	if len(p.Episodes)%10 == 0 {
-		log.Println("total episodes: ", len(p.Episodes))
+	if len(p.Episodes)%30 == 0 {
+		log.Println("episode count: ", len(p.Episodes))
 		if err := p.Encode(); err != nil {
 			return fmt.Errorf("could not encode podcast: %w", err)
 		}
