@@ -35,3 +35,22 @@ func deleteFile(fileName string) {
 		fmt.Println("could not delete temp file: ", err)
 	}
 }
+
+func createFile(path string) (*os.File, error) {
+	var podcastFile *os.File
+	if _, err := os.Stat(path); err == nil {
+		podcastFile, err = os.OpenFile(path, os.O_RDWR, 0666)
+		if err != nil {
+			return &os.File{}, fmt.Errorf("could not open file: %w", err)
+		}
+	} else if os.IsNotExist(err) {
+		podcastFile, err = os.Create(path)
+		if err != nil {
+			return &os.File{}, fmt.Errorf("could not create podcast file: %w", err)
+		}
+	} else {
+		return &os.File{}, fmt.Errorf("could not stat file: %w", err)
+	}
+
+	return podcastFile, nil
+}

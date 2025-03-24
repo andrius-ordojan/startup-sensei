@@ -153,7 +153,8 @@ func (p *RogueStartups) DeletePodcastFile() {
 }
 
 func newRogueStartupsPodcast() (Podcast, error) {
-	file, err := os.Create("roguestartups.json")
+	file, err := createFile("roguestartups.json")
+	// file, err := os.Create("roguestartups.json")
 	if err != nil {
 		return &RogueStartups{}, fmt.Errorf("could not create podcast file: %w", err)
 	}
@@ -162,6 +163,7 @@ func newRogueStartupsPodcast() (Podcast, error) {
 		Episodes:    []*Episode{},
 		podcastFile: file,
 	}
+	fmt.Println(file.Name())
 	return p, nil
 }
 
