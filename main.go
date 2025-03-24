@@ -32,20 +32,13 @@ type Podcast struct {
 	scrape          func(ctx context.Context)
 }
 
-func (p *Podcast) addEpisode(ctx context.Context, e episode) error {
+func (p *Podcast) addEpisode(e episode) error {
 	p.Episodes = append(p.Episodes, &e)
 
 	if len(p.Episodes)%10 == 0 {
-		fmt.Println("total episodes: ", len(p.Episodes))
+		log.Println("total episodes: ", len(p.Episodes))
 		if err := p.encode(); err != nil {
 			return fmt.Errorf("could not encode podcast: %w", err)
-		}
-
-		if ctx.Err() != nil {
-			// TODO: this doesn't terminate after shutdown
-			// maybe return it and catch it as isctxerr in upstream
-			log.Println("context cancelled in  addepisode")
-			return ctx.Err()
 		}
 	}
 
@@ -98,6 +91,11 @@ func newRogueStartupsPodcast() (*Podcast, error) {
 		c := colly.NewCollector(colly.AllowedDomains(p.Domain))
 
 		c.OnHTML("body", func(e *colly.HTMLElement) {
+			if ctx.Err() != nil {
+				// TODO: rewerite this
+				log.Println("context cancelled in  body")
+				return
+			}
 			if !strings.Contains(e.Request.URL.Path, "/episodes/") {
 				return
 			}
@@ -121,23 +119,13 @@ func newRogueStartupsPodcast() (*Podcast, error) {
 				Url:         e.Request.URL.String(),
 			}
 
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				if err := p.addEpisode(ctx, *episode); err != nil {
-					// if err == context.Canceled {
-					// 	return
-					// }
-					log.Printf("error adding episode: %v", err)
-				}
+			if err := p.addEpisode(*episode); err != nil {
+				log.Printf("error adding episode: %v", err)
 			}
 		})
 
-		// TODO: should quit here if ctx is cancelled then I don't need to check every paege
 		c.OnHTML("a[href^='/episodes/']", func(e *colly.HTMLElement) {
 			if ctx.Err() != nil {
-				log.Println("context cancelled in  a[href^='/episodes/']")
 				return
 			}
 
@@ -157,7 +145,6 @@ func newRogueStartupsPodcast() (*Podcast, error) {
 
 		c.OnHTML("a[href*='?page=']", func(e *colly.HTMLElement) {
 			if ctx.Err() != nil {
-				log.Println("context cancelled in  a[href*='?page=']")
 				return
 			}
 
@@ -222,7 +209,7 @@ func NewStartupsForTheRestOfUsPodcast() (*Podcast, error) {
 				Url:         e.Request.URL.String(),
 			}
 
-			p.addEpisode(ctx, *episode)
+			p.addEpisode(*episode)
 		})
 
 		c.Visit(p.ArchivePageLink)
@@ -326,8 +313,10 @@ func run() error {
 	}
 
 	// BUG: doesn't save the pods
+	log.Println("saving podcasts")
 	pods.encode()
 	for _, p := range pods.Podcasts {
+		log.Println("deleting temp file")
 		// BUG: doesn't delete the temp file
 		p.deleteTempFile()
 	}
