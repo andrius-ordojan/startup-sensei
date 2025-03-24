@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"regexp"
 	"strings"
@@ -274,6 +275,37 @@ func NewStartupsForTheRestOfUsPodcast() (Podcast, error) {
 type Podcasts struct {
 	Podcasts    []Podcast
 	podcastFile *os.File
+}
+
+func (p *Podcasts) chunk() error {
+	episodeCount := len(p.Podcasts[0].GetEpisodes()) + len(p.Podcasts[1].GetEpisodes())
+	fmt.Println("episode count: ", episodeCount)
+
+	chunkSize := 500
+	parts := math.Ceil(float64(episodeCount / chunkSize))
+	fmt.Println("parts: ", parts)
+
+	for partNum := range int(parts) {
+		fileName := fmt.Sprintf("podcasts-%d.json", partNum)
+		file, err := createFile(fileName)
+		if err != nil {
+			return fmt.Errorf("could not create podcast file: %w", err)
+		}
+
+		chunkPod := &Podcasts{
+			podcastFile: file,
+		}
+
+		for _, podcast := range p.Podcasts {
+			for i := range podcast.GetEpisodes() {
+				if chunkSize*partNum <= i && i < chunkSize*(partNum+1) {
+					fmt.Println(i)
+				}
+			}
+		}
+
+	}
+	return nil
 }
 
 func (p *Podcasts) encode() error {
