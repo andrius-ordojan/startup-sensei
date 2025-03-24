@@ -25,6 +25,9 @@ func run() error {
 		default:
 			log.Println("starting scraping podcasts")
 			p.Scrape(ctx)
+
+			log.Println("final episode count: ", len(p.GetEpisodes()))
+			p.Encode()
 		}
 	}
 
