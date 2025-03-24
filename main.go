@@ -9,16 +9,9 @@ import (
 	"syscall"
 )
 
-const podcastFilePath = "content.json"
-
 func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-
-	// p, _ := newRogueStartupsPodcast()
-	// fmt.Println(len(p.GetEpisodes()))
-	// p.Decode()
-	// fmt.Println(len(p.GetEpisodes()))
 
 	pods, err := NewPodcasts()
 	if err != nil {
@@ -35,14 +28,13 @@ func run() error {
 		}
 	}
 
-	// BUG: doesn't save the pods
 	log.Println("saving podcasts")
 	pods.encode()
-	// for _, p := range pods.Podcasts {
-	// 	log.Println("deleting temp file")
-	// 	// BUG: doesn't delete the temp file
-	// 	// p.DeletePodcastFile()
-	// }
+
+	log.Println("deleting temp files")
+	for _, p := range pods.Podcasts {
+		p.DeletePodcastFile()
+	}
 
 	return nil
 }

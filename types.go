@@ -14,7 +14,7 @@ import (
 )
 
 type Podcast interface {
-	Domain() string
+	GetDomain() string
 	ArchivePageLink() string
 	Scrape(ctx context.Context)
 	AddEpisode(e Episode) error
@@ -22,7 +22,6 @@ type Podcast interface {
 	PodcastFile() *os.File
 	DeletePodcastFile()
 	Encode() error
-	Decode() error
 }
 
 type Episode struct {
@@ -33,12 +32,13 @@ type Episode struct {
 }
 
 type RogueStartups struct {
+	Domain      string
 	Episodes    []*Episode
 	podcastFile *os.File
 }
 
-func (p *RogueStartups) Domain() string {
-	return "roguestartups.com"
+func (p *RogueStartups) GetDomain() string {
+	return p.Domain
 }
 
 func (p *RogueStartups) ArchivePageLink() string {
@@ -48,12 +48,10 @@ func (p *RogueStartups) ArchivePageLink() string {
 func (p *RogueStartups) Scrape(ctx context.Context) {
 	log.Println("scraping RogueStartups...")
 
-	c := colly.NewCollector(colly.AllowedDomains(p.Domain()))
+	c := colly.NewCollector(colly.AllowedDomains(p.Domain))
 
 	c.OnHTML("body", func(e *colly.HTMLElement) {
 		if ctx.Err() != nil {
-			// TODO: rewerite this
-			log.Println("context cancelled in  body")
 			return
 		}
 		if !strings.Contains(e.Request.URL.Path, "/episodes/") {
@@ -139,10 +137,6 @@ func (p *RogueStartups) Encode() error {
 	return encode(p)
 }
 
-func (p *RogueStartups) Decode() error {
-	return decode(p)
-}
-
 func (p *RogueStartups) PodcastFile() *os.File {
 	return p.podcastFile
 }
@@ -154,26 +148,27 @@ func (p *RogueStartups) DeletePodcastFile() {
 
 func newRogueStartupsPodcast() (Podcast, error) {
 	file, err := createFile("roguestartups.json")
-	// file, err := os.Create("roguestartups.json")
 	if err != nil {
 		return &RogueStartups{}, fmt.Errorf("could not create podcast file: %w", err)
 	}
 
 	p := &RogueStartups{
+		Domain:      "roguestartups.com",
 		Episodes:    []*Episode{},
 		podcastFile: file,
 	}
-	fmt.Println(file.Name())
+
 	return p, nil
 }
 
 type StartupsForTheRestOfUs struct {
+	Domain      string
 	Episodes    []*Episode
 	podcastFile *os.File
 }
 
-func (p *StartupsForTheRestOfUs) Domain() string {
-	return "www.startupsfortherestofus.com"
+func (p *StartupsForTheRestOfUs) GetDomain() string {
+	return p.Domain
 }
 
 func (p *StartupsForTheRestOfUs) ArchivePageLink() string {
@@ -183,11 +178,10 @@ func (p *StartupsForTheRestOfUs) ArchivePageLink() string {
 func (p *StartupsForTheRestOfUs) Scrape(ctx context.Context) {
 	log.Println("scraping StartupsForTheRestOfUs...")
 
-	c := colly.NewCollector(colly.AllowedDomains(p.Domain()))
+	c := colly.NewCollector(colly.AllowedDomains(p.Domain))
 
 	c.OnHTML("ul.archive-list a[href]", func(e *colly.HTMLElement) {
 		if ctx.Err() != nil {
-			log.Println("context cancelled in list archives startupsfortherestofus")
 			return
 		}
 
@@ -254,10 +248,6 @@ func (p *StartupsForTheRestOfUs) Encode() error {
 	return encode(p)
 }
 
-func (p *StartupsForTheRestOfUs) Decode() error {
-	return decode(p)
-}
-
 func (p *StartupsForTheRestOfUs) PodcastFile() *os.File {
 	return p.podcastFile
 }
@@ -268,12 +258,13 @@ func (p *StartupsForTheRestOfUs) DeletePodcastFile() {
 }
 
 func NewStartupsForTheRestOfUsPodcast() (Podcast, error) {
-	file, err := os.Create("startupsfortherestofus.json")
+	file, err := createFile("startupsfortherestofus.json")
 	if err != nil {
 		return &StartupsForTheRestOfUs{}, fmt.Errorf("could not create podcast file: %w", err)
 	}
 
 	p := &StartupsForTheRestOfUs{
+		Domain:      "www.startupsfortherestofus.com",
 		Episodes:    []*Episode{},
 		podcastFile: file,
 	}
@@ -311,45 +302,34 @@ func (p *Podcasts) decode() error {
 }
 
 func NewPodcasts() (*Podcasts, error) {
-	var podcastFile *os.File
-	if _, err := os.Stat(podcastFilePath); err == nil {
-		podcastFile, err = os.OpenFile(podcastFilePath, os.O_RDWR, 0666)
-		if err != nil {
-			return &Podcasts{}, fmt.Errorf("could not open file: %w", err)
-		}
-	} else if os.IsNotExist(err) {
-		podcastFile, err = os.Create(podcastFilePath)
-		if err != nil {
-			return &Podcasts{}, fmt.Errorf("could not create podcast file: %w", err)
-		}
-	} else {
-		return &Podcasts{}, fmt.Errorf("could not stat file: %w", err)
+	file, err := createFile("podcasts.json")
+	if err != nil {
+		return &Podcasts{}, fmt.Errorf("could not create podcast file: %w", err)
 	}
 
 	p := &Podcasts{
-		podcastFile: podcastFile,
+		podcastFile: file,
 	}
+
+	pod, err := newRogueStartupsPodcast()
+	if err != nil {
+		return &Podcasts{}, fmt.Errorf("could not create podcast: %w", err)
+	}
+	p.Podcasts = append(p.Podcasts, pod)
+
+	pod, err = NewStartupsForTheRestOfUsPodcast()
+	if err != nil {
+		return &Podcasts{}, fmt.Errorf("could not create podcast: %w", err)
+	}
+	p.Podcasts = append(p.Podcasts, pod)
+
 	p.decode()
 
-	if len(p.Podcasts) == 0 {
-		pod, err := newRogueStartupsPodcast()
-		if err != nil {
-			return &Podcasts{}, fmt.Errorf("could not create podcast: %w", err)
-		}
-		p.Podcasts = append(p.Podcasts, pod)
-
-		pod, err = NewStartupsForTheRestOfUsPodcast()
-		if err != nil {
-			return &Podcasts{}, fmt.Errorf("could not create podcast: %w", err)
-		}
-		p.Podcasts = append(p.Podcasts, pod)
-		fmt.Println(p)
-	} else {
-		fmt.Println(p)
+	if len(p.Podcasts) > 0 {
 		s := fmt.Sprintf("decoded: %s - %d episodes; %s - %d episodes",
-			p.Podcasts[0].Domain(),
+			p.Podcasts[0].GetDomain(),
 			len(p.Podcasts[0].GetEpisodes()),
-			p.Podcasts[1].Domain(),
+			p.Podcasts[1].GetDomain(),
 			len(p.Podcasts[1].GetEpisodes()))
 		log.Println(s)
 	}
