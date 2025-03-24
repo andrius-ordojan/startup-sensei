@@ -121,18 +121,23 @@ func newRogueStartupsPodcast() (*Podcast, error) {
 				Url:         e.Request.URL.String(),
 			}
 
-			// TODO: should react to termination here
-			if err := p.addEpisode(ctx, *episode); err != nil {
-				if err == context.Canceled {
-					return
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				if err := p.addEpisode(ctx, *episode); err != nil {
+					// if err == context.Canceled {
+					// 	return
+					// }
+					log.Printf("error adding episode: %v", err)
 				}
-
-				log.Printf("error adding episode: %v", err)
 			}
 		})
 
+		// TODO: should quit here if ctx is cancelled then I don't need to check every paege
 		c.OnHTML("a[href^='/episodes/']", func(e *colly.HTMLElement) {
 			if ctx.Err() != nil {
+				log.Println("context cancelled in  a[href^='/episodes/']")
 				return
 			}
 
@@ -152,6 +157,7 @@ func newRogueStartupsPodcast() (*Podcast, error) {
 
 		c.OnHTML("a[href*='?page=']", func(e *colly.HTMLElement) {
 			if ctx.Err() != nil {
+				log.Println("context cancelled in  a[href*='?page=']")
 				return
 			}
 
