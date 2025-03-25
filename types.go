@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"regexp"
 	"strings"
@@ -23,6 +24,7 @@ type Podcast interface {
 	PodcastFile() *os.File
 	DeletePodcastFile()
 	Encode() error
+	ShallowCopy() Podcast
 }
 
 type Episode struct {
@@ -151,6 +153,12 @@ func (p *RogueStartups) DeletePodcastFile() {
 	deleteFile(p.podcastFile.Name())
 }
 
+func (p *RogueStartups) ShallowCopy() Podcast {
+	return &RogueStartups{
+		Domain: p.Domain,
+	}
+}
+
 func newRogueStartupsPodcast() (Podcast, error) {
 	file, err := createFile("roguestartups.json")
 	if err != nil {
@@ -266,6 +274,12 @@ func (p *StartupsForTheRestOfUs) DeletePodcastFile() {
 	deleteFile(p.podcastFile.Name())
 }
 
+func (p *StartupsForTheRestOfUs) ShallowCopy() Podcast {
+	return &StartupsForTheRestOfUs{
+		Domain: p.Domain,
+	}
+}
+
 func NewStartupsForTheRestOfUsPodcast() (Podcast, error) {
 	file, err := createFile("startupsfortherestofus.json")
 	if err != nil {
@@ -280,22 +294,71 @@ func NewStartupsForTheRestOfUsPodcast() (Podcast, error) {
 	return p, nil
 }
 
+type ChunkingOptions struct {
+	enabled bool
+	size    int
+}
+
 type Podcasts struct {
 	Podcasts    []Podcast
 	podcastFile *os.File
 }
 
-func (p *Podcasts) encode() error {
+func (p *Podcasts) encode(opt ChunkingOptions) error {
 	defer p.podcastFile.Close()
 	if err := p.podcastFile.Truncate(0); err != nil {
-		return err
+		return fmt.Errorf("could not truncate file: %v", err)
 	}
 	if _, err := p.podcastFile.Seek(0, 0); err != nil {
-		return err
+		return fmt.Errorf("could not seek file: %v", err)
 	}
 
 	enc := json.NewEncoder(p.podcastFile)
-	return enc.Encode(p)
+	err := enc.Encode(p)
+	if err != nil {
+		return fmt.Errorf("could not encode JSON: %w", err)
+	}
+
+	if opt.enabled {
+		episodeCount := 0
+		for _, p := range p.Podcasts {
+			episodeCount += len(p.GetEpisodes())
+		}
+		parts := int(math.Ceil(float64(episodeCount) / float64(opt.size)))
+
+		for idx := range parts {
+			filename := fmt.Sprintf("podcasts-%d.json", idx+1)
+			file, err := createFile(filename)
+			if err != nil {
+				return fmt.Errorf("could not create podcast file: %w", err)
+			}
+
+			chunkedPodcasts := Podcasts{}
+			chunkedEpisodes := []*Episode{}
+			for _, p := range p.Podcasts {
+				skip := idx * opt.size
+				take := skip + opt.size
+				if take > len(p.GetEpisodes()) {
+					take = len(p.GetEpisodes())
+				}
+				tmp := p.GetEpisodes()[skip:take]
+				chunkedEpisodes := append(chunkedEpisodes, tmp...)
+
+				if len(chunkedEpisodes) == opt.size {
+					newPod := p.ShallowCopy()
+					newPod.SetEpisodes(chunkedEpisodes)
+
+					chunkedPodcasts.Podcasts = append(chunkedPodcasts.Podcasts, newPod)
+					chunkedPodcasts.podcastFile = file
+
+					chunkedPodcasts.encode(ChunkingOptions{enabled: false})
+				}
+			}
+
+		}
+
+	}
+	return nil
 }
 
 func (p *Podcasts) decode() error {
