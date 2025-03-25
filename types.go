@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math"
 	"os"
 	"regexp"
 	"strings"
@@ -19,6 +18,7 @@ type Podcast interface {
 	ArchivePageLink() string
 	Scrape(ctx context.Context)
 	AddEpisode(e Episode) error
+	SetEpisodes(episodes []*Episode)
 	GetEpisodes() []*Episode
 	PodcastFile() *os.File
 	DeletePodcastFile()
@@ -134,6 +134,10 @@ func (p *RogueStartups) GetEpisodes() []*Episode {
 	return p.Episodes
 }
 
+func (p *RogueStartups) SetEpisodes(episodes []*Episode) {
+	p.Episodes = episodes
+}
+
 func (p *RogueStartups) Encode() error {
 	return encode(p)
 }
@@ -245,6 +249,10 @@ func (p *StartupsForTheRestOfUs) GetEpisodes() []*Episode {
 	return p.Episodes
 }
 
+func (p *StartupsForTheRestOfUs) SetEpisodes(episodes []*Episode) {
+	p.Episodes = episodes
+}
+
 func (p *StartupsForTheRestOfUs) Encode() error {
 	return encode(p)
 }
@@ -275,37 +283,6 @@ func NewStartupsForTheRestOfUsPodcast() (Podcast, error) {
 type Podcasts struct {
 	Podcasts    []Podcast
 	podcastFile *os.File
-}
-
-func (p *Podcasts) chunk() error {
-	episodeCount := len(p.Podcasts[0].GetEpisodes()) + len(p.Podcasts[1].GetEpisodes())
-	fmt.Println("episode count: ", episodeCount)
-
-	chunkSize := 500
-	parts := math.Ceil(float64(episodeCount / chunkSize))
-	fmt.Println("parts: ", parts)
-
-	for partNum := range int(parts) {
-		fileName := fmt.Sprintf("podcasts-%d.json", partNum)
-		file, err := createFile(fileName)
-		if err != nil {
-			return fmt.Errorf("could not create podcast file: %w", err)
-		}
-
-		chunkPod := &Podcasts{
-			podcastFile: file,
-		}
-
-		for _, podcast := range p.Podcasts {
-			for i := range podcast.GetEpisodes() {
-				if chunkSize*partNum <= i && i < chunkSize*(partNum+1) {
-					fmt.Println(i)
-				}
-			}
-		}
-
-	}
-	return nil
 }
 
 func (p *Podcasts) encode() error {

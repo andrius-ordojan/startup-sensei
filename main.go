@@ -17,8 +17,6 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("could not create podcasts: %w", err)
 	}
-	pods.chunk()
-	return nil
 
 	for _, p := range pods.Podcasts {
 		select {
