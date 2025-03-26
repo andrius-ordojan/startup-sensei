@@ -326,38 +326,53 @@ func (p *Podcasts) encode(opt ChunkingOptions) error {
 		}
 		parts := int(math.Ceil(float64(episodeCount) / float64(opt.size)))
 
-		chunkedPodcasts := Podcasts{}
 		podIdx := 0
 		pod := p.Podcasts[podIdx]
 		for idx := range parts {
-			skip := idx * opt.size
-			take := skip + opt.size
-			EndOfPodcast := false
-			if take > len(pod.GetEpisodes()) {
-				take = len(pod.GetEpisodes())
-				EndOfPodcast = true
+			filename := fmt.Sprintf("podcasts-%d.json", idx+1)
+			file, err := createFile(filename)
+			if err != nil {
+				return fmt.Errorf("could not create podcast file: %w", err)
 			}
 
-			// TODO: save these somewhere before
-			chunkedEpisodes := pod.GetEpisodes()[skip:take]
+			chunkedPodcasts := Podcasts{}
+			chunkedPodcasts.podcastFile = file
 
-			if len(chunkedEpisodes) == opt.size || EndOfPodcast {
-				filename := fmt.Sprintf("podcasts-%d.json", idx+1)
-				file, err := createFile(filename)
-				if err != nil {
-					return fmt.Errorf("could not create podcast file: %w", err)
+			newPod := pod.ShallowCopy()
+
+			chunkedEpisodes := []*Episode{}
+			isEndOfPodcast := false
+			episodeCount := 0
+			// TODO: should loop over podcasts instead
+			for len(chunkedEpisodes) != opt.size {
+				skip := idx * opt.size
+				take := skip + opt.size
+				if take > len(pod.GetEpisodes()) {
+					take = len(pod.GetEpisodes())
+					isEndOfPodcast = true
 				}
 
-				newPod := pod.ShallowCopy()
-				newPod.SetEpisodes()
+				chunkedEpisodes = append(chunkedEpisodes, pod.GetEpisodes()[skip:take]...)
 
-				chunkedPodcasts.Podcasts = append(chunkedPodcasts.Podcasts, newPod)
-				chunkedPodcasts.podcastFile = file
-				chunkedPodcasts.encode(ChunkingOptions{enabled: false})
+				if isEndOfPodcast {
+					newPod.SetEpisodes(chunkedEpisodes)
+					chunkedPodcasts.Podcasts = append(chunkedPodcasts.Podcasts, newPod)
 
-				podIdx++
-				pod = p.Podcasts[podIdx]
+					podIdx++
+					if podIdx >= len(p.Podcasts) {
+						break
+					}
+					pod = p.Podcasts[podIdx]
+					newPod = pod.ShallowCopy()
+					chunkedEpisodes = []*Episode{}
+				} else if len(chunkedEpisodes) == opt.size {
+					newPod.SetEpisodes(chunkedEpisodes)
+					chunkedPodcasts.Podcasts = append(chunkedPodcasts.Podcasts, newPod)
+
+					chunkedEpisodes = []*Episode{}
+				}
 			}
+			chunkedPodcasts.encode(ChunkingOptions{enabled: false})
 		}
 
 	}

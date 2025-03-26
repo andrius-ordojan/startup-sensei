@@ -17,6 +17,9 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("could not create podcasts: %w", err)
 	}
+	log.Println("saving podcasts")
+	pods.encode(ChunkingOptions{enabled: true, size: 500})
+	return nil
 
 	for _, p := range pods.Podcasts {
 		select {
@@ -32,7 +35,7 @@ func run() error {
 	}
 
 	log.Println("saving podcasts")
-	pods.encode()
+	pods.encode(ChunkingOptions{enabled: true, size: 500})
 
 	log.Println("deleting temp files")
 	for _, p := range pods.Podcasts {
