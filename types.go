@@ -335,7 +335,6 @@ func (p *Podcasts) encode(opt ChunkingOptions) error {
 			if err != nil {
 				return fmt.Errorf("could not create podcast file: %w", err)
 			}
-			defer file.Close()
 
 			chunkedPodcasts := Podcasts{}
 			chunkedPodcasts.podcastFile = file
@@ -354,7 +353,6 @@ func (p *Podcasts) encode(opt ChunkingOptions) error {
 
 				chunkedEpisodes = append(chunkedEpisodes, pod.GetEpisodes()[skip:take]...)
 				totalEpisodes += len(chunkedEpisodes)
-				// skip += take
 				skip = take
 
 				if isEndOfPodcast {
@@ -375,10 +373,17 @@ func (p *Podcasts) encode(opt ChunkingOptions) error {
 			}
 
 			newPod.SetEpisodes(chunkedEpisodes)
+			// TODO: gets added twice if the podcast ends if finsheds in the middle this is correct
 			chunkedPodcasts.Podcasts = append(chunkedPodcasts.Podcasts, newPod)
+			fmt.Println("chunkedPodcasts: ", chunkedPodcasts)
+			sum := 0
+			for _, p := range chunkedPodcasts.Podcasts {
+				sum += len(p.GetEpisodes())
+			}
+			fmt.Println("sum of Episodes: ", sum)
+
 			chunkedPodcasts.encode(ChunkingOptions{enabled: false})
 		}
-
 	}
 	return nil
 }
