@@ -18,21 +18,20 @@ func run() error {
 		return fmt.Errorf("could not create podcasts: %w", err)
 	}
 
+	log.Println("starting scraping podcasts")
 	for _, p := range pods.Podcasts {
 		select {
 		case <-ctx.Done():
 			log.Println("Shutdown signal received, aborting scraping")
 		default:
-			log.Println("starting scraping podcasts")
 			p.Scrape(ctx)
-
 			log.Println("final episode count: ", len(p.GetEpisodes()))
 			p.Encode()
 		}
 	}
 
 	log.Println("saving podcasts")
-	pods.encode(ChunkingOptions{enabled: true, size: 500})
+	pods.encode(ChunkingOptions{enabled: true, size: 600})
 
 	log.Println("deleting temp files")
 	for _, p := range pods.Podcasts {
