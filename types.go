@@ -327,6 +327,7 @@ func (p *Podcasts) encode(opt ChunkingOptions) error {
 		parts := int(math.Ceil(float64(episodeCount) / float64(opt.size)))
 
 		podIdx := 0
+		skip := 0
 		pod := p.Podcasts[podIdx]
 		for idx := range parts {
 			filename := fmt.Sprintf("podcasts-%d.json", idx+1)
@@ -334,25 +335,27 @@ func (p *Podcasts) encode(opt ChunkingOptions) error {
 			if err != nil {
 				return fmt.Errorf("could not create podcast file: %w", err)
 			}
+			defer file.Close()
 
 			chunkedPodcasts := Podcasts{}
 			chunkedPodcasts.podcastFile = file
 
+			chunkedEpisodes := []*Episode{}
 			newPod := pod.ShallowCopy()
 
-			chunkedEpisodes := []*Episode{}
 			isEndOfPodcast := false
-			episodeCount := 0
-			// TODO: should loop over podcasts instead
-			for len(chunkedEpisodes) != opt.size {
-				skip := idx * opt.size
-				take := skip + opt.size
+			totalEpisodes := 0
+			for totalEpisodes < opt.size {
+				take := skip + int(math.Abs(float64(totalEpisodes-opt.size)))
 				if take > len(pod.GetEpisodes()) {
 					take = len(pod.GetEpisodes())
 					isEndOfPodcast = true
 				}
 
 				chunkedEpisodes = append(chunkedEpisodes, pod.GetEpisodes()[skip:take]...)
+				totalEpisodes += len(chunkedEpisodes)
+				// skip += take
+				skip = take
 
 				if isEndOfPodcast {
 					newPod.SetEpisodes(chunkedEpisodes)
@@ -362,16 +365,17 @@ func (p *Podcasts) encode(opt ChunkingOptions) error {
 					if podIdx >= len(p.Podcasts) {
 						break
 					}
+
 					pod = p.Podcasts[podIdx]
 					newPod = pod.ShallowCopy()
 					chunkedEpisodes = []*Episode{}
-				} else if len(chunkedEpisodes) == opt.size {
-					newPod.SetEpisodes(chunkedEpisodes)
-					chunkedPodcasts.Podcasts = append(chunkedPodcasts.Podcasts, newPod)
-
-					chunkedEpisodes = []*Episode{}
+					skip = 0
+					isEndOfPodcast = false
 				}
 			}
+
+			newPod.SetEpisodes(chunkedEpisodes)
+			chunkedPodcasts.Podcasts = append(chunkedPodcasts.Podcasts, newPod)
 			chunkedPodcasts.encode(ChunkingOptions{enabled: false})
 		}
 
