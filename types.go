@@ -376,14 +376,6 @@ func (p *Podcasts) encode(opt ChunkingOptions) error {
 				newPod.SetEpisodes(chunkedEpisodes)
 				chunkedPodcasts.Podcasts = append(chunkedPodcasts.Podcasts, newPod)
 			}
-
-			fmt.Println("chunkedPodcasts: ", chunkedPodcasts)
-			sum := 0
-			for _, p := range chunkedPodcasts.Podcasts {
-				sum += len(p.GetEpisodes())
-			}
-			fmt.Println("sum of Episodes: ", sum)
-
 			chunkedPodcasts.encode(ChunkingOptions{enabled: false})
 		}
 	}
