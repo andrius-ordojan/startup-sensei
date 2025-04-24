@@ -395,7 +395,6 @@ func (p *Podcasts) decode() error {
 	return nil
 }
 
-// TODO: add this every where instead of previose method.
 func (p *Podcasts) DeleteTempFiles() error {
 	for _, pod := range p.Podcasts {
 		pod.DeletePodcastFile()
