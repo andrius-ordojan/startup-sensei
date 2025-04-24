@@ -45,8 +45,6 @@ func (c *Counter[T]) Duplicates() []Pair[T] {
 
 func TestNoDuplicatePodcasts(t *testing.T) {
 	pods, err := NewPodcasts()
-	// TODO: clear temp files
-	// how to do final post test thing?
 	if err != nil {
 		t.Fatalf("could not create podcasts: %s", err)
 	}
