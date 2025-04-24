@@ -25,6 +25,9 @@ jobs:
       - name: Run startup-sensei
         run: ./startup-sensei
 
+      - name: Test
+        run: go test -v
+
       - name: Commit and Push Changes
         run: |
           git config user.name "github-actions[bot]"
