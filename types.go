@@ -376,6 +376,7 @@ func (p *Podcasts) encode(opt ChunkingOptions) error {
 				newPod.SetEpisodes(chunkedEpisodes)
 				chunkedPodcasts.Podcasts = append(chunkedPodcasts.Podcasts, newPod)
 			}
+
 			chunkedPodcasts.encode(ChunkingOptions{enabled: false})
 		}
 	}
@@ -390,6 +391,14 @@ func (p *Podcasts) decode() error {
 	dec := json.NewDecoder(p.podcastFile)
 	if err := dec.Decode(p); err != nil {
 		return fmt.Errorf("cloud not decode JSON: %w", err)
+	}
+	return nil
+}
+
+// TODO: add this every where instead of previose method.
+func (p *Podcasts) DeleteTempFiles() error {
+	for _, pod := range p.Podcasts {
+		pod.DeletePodcastFile()
 	}
 	return nil
 }
