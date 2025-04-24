@@ -34,9 +34,7 @@ func run() error {
 	pods.encode(ChunkingOptions{enabled: true, size: 600})
 
 	log.Println("deleting temp files")
-	for _, p := range pods.Podcasts {
-		p.DeletePodcastFile()
-	}
+	pods.DeleteTempFiles()
 
 	return nil
 }

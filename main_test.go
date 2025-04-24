@@ -33,14 +33,6 @@ func (c *Counter[T]) Keys() []T {
 	return keys
 }
 
-func (c *Counter[T]) Items() map[T]int {
-	out := make(map[T]int, len(c.counts))
-	for k, v := range c.counts {
-		out[k] = v
-	}
-	return out
-}
-
 func (c *Counter[T]) Duplicates() []Pair[T] {
 	dupes := make([]Pair[T], 0)
 	for k, v := range c.counts {
@@ -58,6 +50,7 @@ func TestNoDuplicatePodcasts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not create podcasts: %s", err)
 	}
+	defer pods.DeleteTempFiles()
 
 	counter := NewCounter[string]()
 	for _, p := range pods.Podcasts {
