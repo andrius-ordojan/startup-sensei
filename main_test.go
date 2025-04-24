@@ -43,7 +43,7 @@ func (c *Counter[T]) Duplicates() []Pair[T] {
 	return dupes
 }
 
-func TestNoDuplicatePodcasts(t *testing.T) {
+func TestNoDuplicateEpisodes(t *testing.T) {
 	pods, err := NewPodcasts()
 	if err != nil {
 		t.Fatalf("could not create podcasts: %s", err)
@@ -60,5 +60,21 @@ func TestNoDuplicatePodcasts(t *testing.T) {
 	duplicates := counter.Duplicates()
 	if len(duplicates) > 0 {
 		t.Fatalf("found duplicate podcasts: %v", duplicates)
+	}
+}
+
+func TestEmptyContentEpisodes(t *testing.T) {
+	pods, err := NewPodcasts()
+	if err != nil {
+		t.Fatalf("could not create podcasts: %s", err)
+	}
+	defer pods.DeleteTempFiles()
+
+	for _, p := range pods.Podcasts {
+		for _, e := range p.GetEpisodes() {
+			if e.Content == "" {
+				t.Fatalf("found empty content in episode: %s", e.Title)
+			}
+		}
 	}
 }
