@@ -70,11 +70,16 @@ func TestEmptyContentEpisodes(t *testing.T) {
 	}
 	defer pods.DeleteTempFiles()
 
+	noContentEpisodes := []string{}
 	for _, p := range pods.Podcasts {
 		for _, e := range p.GetEpisodes() {
 			if e.Content == "" {
-				t.Fatalf("found empty content in episode: %s", e.Title)
+				noContentEpisodes = append(noContentEpisodes, e.Title)
 			}
 		}
+	}
+
+	if len(noContentEpisodes) > 0 {
+		t.Fatalf("found episodes with empty content: %v", noContentEpisodes)
 	}
 }
