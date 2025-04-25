@@ -8,4 +8,4 @@ test:
 	go test -v
 
 clear:
-	rm content.json 
+	rm *.json 
