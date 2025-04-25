@@ -60,12 +60,27 @@ func (p *RogueStartups) Scrape(ctx context.Context) {
 		if !strings.Contains(e.Request.URL.Path, "/episodes/") {
 			return
 		}
+		if strings.Contains(e.Request.URL.Path, "test-58") {
+			return
+		} else if strings.Contains(e.Request.URL.Path, "test-60") {
+			return
+		}
 
 		title := strings.TrimSpace(e.DOM.Find("h1.text-3xl").Text())
+		for _, ep := range p.Episodes {
+			if ep.Title == title {
+				return
+			}
+		}
+
 		publishedDate := strings.TrimSpace(e.DOM.Find("span.text-sm.text-skin-a11y").First().Text())
 
 		re := regexp.MustCompile(`\s+`)
 		transcript := re.ReplaceAllString(strings.TrimSpace(e.DOM.Find("#transcript-body").Text()), " ")
+		if transcript == "" {
+			return
+		}
+
 		showNotes := ""
 		e.DOM.Find("h2").Each(func(i int, s *goquery.Selection) {
 			if strings.Contains(s.Text(), "Show Notes") {
@@ -215,6 +230,12 @@ func (p *StartupsForTheRestOfUs) Scrape(ctx context.Context) {
 			return
 		}
 
+		if strings.Contains(e.Request.URL.Path, "/archives") {
+			logEntry := fmt.Sprintf("skipping %s", e.Request.URL.Path)
+			log.Println(logEntry)
+			return
+		}
+
 		e.DOM.Find(".social-share").Remove()
 		e.DOM.Find(".podcast_player").Remove()
 
@@ -224,6 +245,9 @@ func (p *StartupsForTheRestOfUs) Scrape(ctx context.Context) {
 		content := strings.TrimSpace(e.DOM.Find("div.entry-content").Text())
 		re := regexp.MustCompile(`\s+`)
 		content = re.ReplaceAllString(content, " ")
+		if content == "" {
+			return
+		}
 
 		episode := &Episode{
 			Title:       title,
