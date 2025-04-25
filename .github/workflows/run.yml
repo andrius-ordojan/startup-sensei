@@ -37,4 +37,3 @@ jobs:
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # - uses: actions4git/add-commit-push@v1
